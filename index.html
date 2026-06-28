@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flappy Universe Pro</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background-color: #111;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            user-select: none;
+        }
+        #gameContainer {
+            position: relative;
+            width: 360px;
+            height: 640px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+        canvas { display: block; }
+        
+        /* UI Menu Styling */
+        #menuScreen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(#2c5d63, #63988e, #7fa99b);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 25px 15px;
+            z-index: 10;
+        }
+        .title {
+            font-size: 34px;
+            font-weight: 900;
+            color: #fce144;
+            text-shadow: 3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+            text-align: center;
+            line-height: 1.1;
+            margin-bottom: 25px;
+            letter-spacing: 2px;
+        }
+        .modes-container {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            margin-bottom: 25px;
+            padding: 0 5px;
+        }
+        .mode-btn {
+            flex: 1;
+            background: #5c9c1e;
+            border: 4px solid #000;
+            border-radius: 10px;
+            padding: 12px 6px;
+            color: #fff;
+            font-weight: 900;
+            font-size: 13px;
+            text-align: center;
+            cursor: pointer;
+            text-shadow: 2px 2px 0 #000;
+            box-shadow: inset -4px -4px 0 rgba(0,0,0,0.4), 0 4px 0 #000;
+            line-height: 1.3;
+        }
+        .mode-btn.active {
+            background: #f7db11;
+            color: #000;
+            text-shadow: none;
+            box-shadow: inset 4px 4px 0 rgba(0,0,0,0.3), 0 2px 0 #000;
+            transform: translateY(2px);
+        }
+        .section-title {
+            font-size: 15px;
+            color: #fff;
+            font-weight: bold;
+            text-shadow: 2px 2px 0 #000;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+        }
+        .character-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            width: 100%;
+            margin-bottom: 30px;
+        }
+        .char-card {
+            background: #eefbee;
+            border: 3px solid #000;
+            border-radius: 8px;
+            height: 95px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.2);
+        }
+        .char-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .char-card.selected {
+            border-color: #f75311;
+            box-shadow: 0 0 12px #f75311, inset 0 0 8px rgba(247, 83, 17, 0.5);
+        }
+        .char-card.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 2px; right: 5px;
+            color: #f75311; font-weight: bold; font-size: 14px;
+            text-shadow: 1px 1px 0 #fff;
+        }
+        .start-btn {
+            background: #f34727;
+            border: 4px solid #000;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 24px;
+            font-weight: bold;
+            padding: 12px 40px;
+            cursor: pointer;
+            text-shadow: 2px 2px 0 #000;
+            box-shadow: inset -4px -4px 0 rgba(0,0,0,0.3), 0 5px 0 #000;
+            text-transform: uppercase;
+        }
+        .start-btn:active {
+            transform: translateY(3px);
+            box-shadow: inset 2px 2px 0 rgba(0,0,0,0.3), 0 2px 0 #000;
+        }
+        #scoreContainer {
+            position: absolute;
+            top: 15px; width: 100%;
+            display: flex;
+            justify-content: space-around;
+            pointer-events: none;
+            z-index: 5;
+            display: none;
+        }
+        .score-box {
+            font-size: 24px; color: #fff; font-weight: bold;
+            text-shadow: 2px 2px 0 #000;
+        }
+        #hudOverlay {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center; color: #fff;
+            font-weight: bold; text-shadow: 3px 3px 0 #000;
+            font-size: 28px; display: none; z-index: 6;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <div id="menuScreen">
+        <div class="title">FLAPPY<br>UNIVERSE</div>
+        
+        <div class="modes-container">
+            <div class="mode-btn active" id="btnNormal" onclick="triggerUiClick(); setMode('NORMAL')">NORMAL<br>MODE</div>
+            <div class="mode-btn" id="btnSpeed" onclick="triggerUiClick(); setMode('SPEED RUN')">SPEED RUN<br>MODE</div>
+        </div>
+
+        <div class="section-title">SELECT YOUR VEHICLE</div>
+        
+        <div class="character-grid">
+            <div class="char-card selected" id="char-bird" onclick="triggerUiClick(); selectChar('bird')">
+                <img src="birdscreen.png" alt="Bird" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <span style="display:none; font-size:11px; font-weight:bold; color:#000;">BIRD</span>
+            </div>
+            <div class="char-card" id="char-elephant" onclick="triggerUiClick(); selectChar('elephant')">
+                <img src="elephantscreen.png" alt="Elephant" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <span style="display:none; font-size:11px; font-weight:bold; color:#000;">ELEPHANT</span>
+            </div>
+            <div class="char-card" id="char-chapal" onclick="triggerUiClick(); selectChar('chapal')">
+                <img src="chapalscreen.png" alt="Chapal" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <span style="display:none; font-size:11px; font-weight:bold; color:#000;">CHAPAL</span>
+            </div>
+            <div class="char-card" id="char-plane" onclick="triggerUiClick(); selectChar('plane')">
+                <img src="planescreen.png" alt="Plane" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <span style="display:none; font-size:11px; font-weight:bold; color:#000;">PLANE</span>
+            </div>
+            <div class="char-card" id="char-auto" onclick="triggerUiClick(); selectChar('auto')">
+                <img src="autoscreen.png" alt="Auto" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <span style="display:none; font-size:11px; font-weight:bold; color:#000;">AUTO</span>
+            </div>
+            <div class="char-card" id="char-custom6" onclick="triggerUiClick(); selectChar('custom6')">
+                <img src="custom6screen.png" alt="Custom 6" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <span style="display:none; font-size:11px; font-weight:bold; color:#000;">ANTIGRAVITY</span>
+            </div>
+        </div>
+
+        <button class="start-btn" onclick="triggerUiClick(); startGame()">START GAME</button>
+    </div>
+
+    <div id="scoreContainer">
+        <div class="score-box">Pipes: <span id="pipeScore">0</span></div>
+        <div class="score-box" id="coinScoreWrapper" style="display:none;">Coins: <span id="coinScore">0</span></div>
+    </div>
+    
+    <div id="hudOverlay"></div>
+    <canvas id="gameCanvas" width="360" height="640"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Load Game Sprites
+    const images = {
+        bird: new Image(), elephant: new Image(), chapal: new Image(), plane: new Image(), auto: new Image(), custom6: new Image()
+    };
+    images.bird.src = 'bird.png';
+    images.elephant.src = 'elephant.png';
+    images.chapal.src = 'chapal.png';
+    images.plane.src = 'plane.png';
+    images.auto.src = 'indianauto.png';
+    images.custom6.src = 'graviti.png'; // CHANGED: New file configuration link
+
+    // Audio Object Maps
+    const sounds = {
+        click: new Audio('click.ogg'),
+        bgNormal: new Audio('bg.ogg'),
+        bgSpeed: new Audio('speed.ogg'),
+        taps: {
+            bird: new Audio('birdtapsound.ogg'),
+            elephant: new Audio('elephanttap.ogg'),
+            chapal: new Audio('chapaltapsound.ogg'),
+            plane: new Audio('aeroplanetapsound.ogg'),
+            auto: new Audio('autotapsound.ogg'),
+            custom6: new Audio('appletapsound.ogg') // Shares same sound asset for taps
+        },
+        hits: {
+            bird: new Audio('birdhitsound.ogg'),
+            elephant: new Audio('elephenthit.ogg'),
+            chapal: new Audio('chapalhitsound.ogg'),
+            plane: new Audio('aeroplanehitsound.ogg'),
+            auto: new Audio('autohitsound.ogg'),
+            custom6: new Audio('applehitsound.ogg')
+        }
+    };
+    
+    sounds.bgNormal.loop = true;
+    sounds.bgSpeed.loop = true;
+
+    function triggerUiClick() {
+        sounds.click.currentTime = 0;
+        sounds.click.play().catch(()=>{});
+    }
+
+    let gameMode = 'NORMAL'; 
+    let selectedCharacter = 'bird';
+    let isPlaying = false;
+    let score = 0; let coinsCollected = 0; let frameCount = 0;
+    let currentPipeSpeed = 2.5; let currentGravity = 0.25; let currentFlap = -5.5;
+    let spawnRate = 100; let pipeGap = 160;
+    
+    let timeOfDayProgress = 0; 
+    let isNight = false;
+
+    let pipes = []; let coins = []; let bullets = []; let pedestrians = []; let lightnings = [];
+    let bgOffset = 0;
+    let apartmentBuildings = [];
+
+    for(let i=0; i<8; i++) {
+        apartmentBuildings.push({
+            x: i * 65,
+            width: 50,
+            height: 120 + Math.random() * 80,
+            windowRows: 4 + Math.floor(Math.random() * 3),
+            windowCols: 2
+        });
+    }
+
+    // Player Object
+    const player = {
+        x: 70, y: 250, w: 38, h: 30,
+        velocity: 0, rotation: 0,
+        hasExtraLife: false, lastFired: 0,
+        reset() {
+            this.x = 70;
+            this.y = 250;
+            this.velocity = 0; this.rotation = 0;
+            this.hasExtraLife = (selectedCharacter === 'chapal');
+        },
+        flap() {
+            // CHANGED: Custom 6 reverse tap effect (pushing downward instead of up)
+            if(selectedCharacter === 'custom6') {
+                this.velocity = 5.3; // Positive value pushes down
+                sounds.taps.custom6.currentTime = 0; sounds.taps.custom6.play().catch(()=>{});
+                return;
+            }
+            
+            this.velocity = currentFlap;
+            if(sounds.taps[selectedCharacter]) {
+                sounds.taps[selectedCharacter].currentTime = 0;
+                sounds.taps[selectedCharacter].play().catch(()=>{});
+            }
+            if (selectedCharacter === 'auto') { this.fireBullet(); }
+        },
+        fireBullet() {
+            let now = Date.now();
+            if (now - this.lastFired > 200) {
+                bullets.push({ x: this.x + 20, y: this.y, w: 12, h: 6, speed: 6 });
+                this.lastFired = now;
+            }
+        },
+        update() {
+            // CHANGED: Custom 6 applies inverse negative gravity (pulls upward automatically)
+            if(selectedCharacter === 'custom6') {
+                this.velocity -= 0.24; // Pull up
+                this.y += this.velocity;
+                this.rotation = Math.min(Math.max(this.velocity * 0.04, -0.6), 0.3);
+                return;
+            }
+
+            this.velocity += currentGravity;
+            this.y += this.velocity;
+            if (selectedCharacter === 'plane') {
+                this.rotation = Math.min(Math.max(this.velocity * 0.08, -0.5), 0.5);
+            } else {
+                this.rotation = Math.min(Math.max(this.velocity * 0.04, -0.3), 0.6);
+            }
+        },
+        draw() {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(this.rotation);
+            let img = images[selectedCharacter];
+            if (img && img.complete && img.naturalWidth !== 0) {
+                ctx.drawImage(img, -this.w/2, -this.h/2, this.w, this.h);
+            } else {
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '24px sans-serif';
+                let emo = { bird:'🐤', elephant:'🐘', chapal:'🩴', plane:'✈️', auto:'🛺', custom6:'🎈' }[selectedCharacter];
+                ctx.fillText(emo, 0, 0);
+            }
+            ctx.restore();
+        }
+    };
+
+    function setMode(mode) {
+        gameMode = mode;
+        document.getElementById('btnNormal').classList.toggle('active', mode === 'NORMAL');
+        document.getElementById('btnSpeed').classList.toggle('active', mode === 'SPEED RUN');
+    }
+
+    function selectChar(charKey) {
+        selectedCharacter = charKey;
+        document.querySelectorAll('.char-card').forEach(c => c.classList.remove('selected'));
+        document.getElementById(`char-${charKey}`).classList.add('selected');
+    }
+
+    function startGame() {
+        document.getElementById('menuScreen').style.display = 'none';
+        document.getElementById('scoreContainer').style.display = 'flex';
+        document.getElementById('coinScoreWrapper').style.display = (gameMode === 'SPEED RUN' || selectedCharacter === 'chapal') ? 'block' : 'none';
+        
+        isPlaying = true;
+        score = 0; coinsCollected = 0; frameCount = 0; timeOfDayProgress = 0; isNight = false;
+        document.getElementById('pipeScore').innerText = '0';
+        document.getElementById('coinScore').innerText = '0';
+        
+        pipes = []; coins = []; bullets = []; pedestrians = []; lightnings = [];
+        
+        sounds.bgNormal.pause(); sounds.bgSpeed.pause();
+        if(gameMode === 'SPEED RUN') { sounds.bgSpeed.play().catch(()=>{}); } 
+        else { sounds.bgNormal.play().catch(()=>{}); }
+
+        currentPipeSpeed = (gameMode === 'SPEED RUN') ? 4.2 : 2.5;
+        if (selectedCharacter === 'chapal' && gameMode === 'SPEED RUN') currentPipeSpeed = 5.5; 
+        
+        currentGravity = (selectedCharacter === 'elephant') ? 0.38 : 0.24; 
+        currentFlap = (selectedCharacter === 'elephant') ? -6.5 : -5.3;
+        pipeGap = (gameMode === 'SPEED RUN') ? 140 : 165;
+        spawnRate = (gameMode === 'SPEED RUN') ? 80 : 110;
+
+        player.reset();
+    }
+
+    function generateLightningPath(startX, startY, endY) {
+        let segments = []; let currX = startX; let currY = startY;
+        while(currY < endY) {
+            let nextY = currY + 10 + Math.random() * 20;
+            if(nextY > endY) nextY = endY;
+            let nextX = currX + (Math.random() - 0.5) * 25;
+            segments.push({x1: currX, y1: currY, x2: nextX, y2: nextY});
+            if(Math.random() < 0.18) {
+                segments.push({x1: currX, y1: currY, x2: currX + (Math.random() - 0.5) * 40, y2: currY + 15});
+            }
+            currX = nextX; currY = nextY;
+        }
+        return segments;
+    }
+
+    function buildObstacles() {
+        frameCount++;
+        
+        timeOfDayProgress++;
+        if(timeOfDayProgress >= 600) {
+            isNight = !isNight;
+            timeOfDayProgress = 0;
+        }
+
+        if (frameCount % spawnRate === 0) {
+            let minH = 60;
+            let maxH = canvas.height - 150 - pipeGap - minH;
+            let topH = Math.floor(Math.random() * (maxH - minH + 1)) + minH;
+            
+            pipes.push({ 
+                x: canvas.width, top: topH, bottom: topH + pipeGap, w: 52, passed: false, blasted: false
+            });
+
+            if (selectedCharacter === 'auto') {
+                pedestrians.push({ x: canvas.width + 10, y: topH + (pipeGap / 2) + 10, w: 16, h: 32, speed: currentPipeSpeed });
+            }
+            if (gameMode === 'SPEED RUN') {
+                coins.push({ x: canvas.width + 100, y: topH + (pipeGap / 2), radius: 8, collected: false });
+            }
+        }
+
+        if (selectedCharacter === 'plane' && frameCount % 160 === 0 && pipes.length > 0) {
+            let targetCheck = Math.random() < 0.25;
+            if (targetCheck) {
+                let targets = pipes.filter(p => !p.blasted && p.x > canvas.width*0.4);
+                if (targets.length > 0) {
+                    let targetPipe = targets[0];
+                    targetPipe.blasted = true;
+                    let boltSegments = generateLightningPath(targetPipe.x + 26, 0, canvas.height - 120);
+                    lightnings.push({ segments: boltSegments, timer: 20 });
+                }
+            }
+        }
+    }
+
+    function updateEngine() {
+        if (!isPlaying) return;
+        player.update();
+        bgOffset += currentPipeSpeed;
+
+        pipes.forEach(pipe => {
+            pipe.x -= currentPipeSpeed;
+            if (!pipe.passed && player.x > pipe.x + pipe.w / 2) {
+                score++;
+                document.getElementById('pipeScore').innerText = score;
+                pipe.passed = true;
+            }
+        });
+
+        coins.forEach(coin => {
+            coin.x -= currentPipeSpeed;
+            if (selectedCharacter === 'chapal' && !coin.collected) {
+                let dist = Math.hypot(player.x - coin.x, player.y - coin.y);
+                if (dist < 90) {
+                    coin.x += (player.x - coin.x) * 0.15;
+                    coin.y += (player.y - coin.y) * 0.15;
+                }
+            }
+            if (!coin.collected && Math.hypot(player.x - coin.x, player.y - coin.y) < player.w / 2 + coin.radius) {
+                coin.collected = true; coinsCollected++;
+                document.getElementById('coinScore').innerText = coinsCollected;
+            }
+        });
+
+        bullets.forEach(b => b.x += b.speed);
+        pedestrians.forEach(p => p.x -= p.speed);
+
+        bullets.forEach(b => {
+            pedestrians.forEach(p => {
+                if (b.x < p.x + p.w && b.x + b.w > p.x && b.y < p.y + p.h && b.y + b.h > p.y) {
+                    p.x = -200; b.x = 9999;
+                }
+            });
+        });
+
+        pipes = pipes.filter(p => p.x + p.w > -60);
+        coins = coins.filter(c => c.x > -20);
+        bullets = bullets.filter(b => b.x < canvas.width + 20);
+        pedestrians = pedestrians.filter(p => p.x > -50);
+        lightnings.forEach(l => l.timer--);
+        lightnings = lightnings.filter(l => l.timer > 0);
+
+        evalCollisions();
+    }
+
+    function evalCollisions() {
+        const groundY = canvas.height - 120;
+        let crash = false;
+
+        if (player.y - player.h/2 <= 0 || player.y + player.h/2 >= groundY) crash = true;
+
+        pipes.forEach(pipe => {
+            if (!pipe.blasted) {
+                if (player.x + player.w/2 > pipe.x && player.x - player.w/2 < pipe.x + pipe.w) {
+                    if (player.y - player.h/2 < pipe.top || player.y + player.h/2 > pipe.bottom) {
+                        crash = true;
+                    }
+                }
+            }
+        });
+
+        pedestrians.forEach(p => {
+            if (player.x + player.w/2 > p.x && player.x - player.w/2 < p.x + p.w) {
+                if (player.y + player.h/2 > p.y && player.y - player.h/2 < p.y + p.h) crash = true;
+            }
+        });
+
+        if (crash) {
+            if (sounds.hits[selectedCharacter]) {
+                sounds.hits[selectedCharacter].currentTime = 0;
+                sounds.hits[selectedCharacter].play().catch(()=>{});
+            }
+
+            if (player.hasExtraLife) {
+                player.hasExtraLife = false; player.y += 80; player.velocity = 0; // Revive down shift
+                ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height);
+            } else {
+                isPlaying = false;
+                sounds.bgNormal.pause(); sounds.bgSpeed.pause();
+                document.getElementById('hudOverlay').style.display = 'block';
+                document.getElementById('hudOverlay').innerHTML = "GAME OVER<br><span style='font-size:14px;color:#ff9800;'>TAP TO MENU</span>";
+            }
+        }
+    }
+
+    function drawGraphics() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        if(isNight) {
+            ctx.fillStyle = '#181a24';
+        } else {
+            ctx.fillStyle = (selectedCharacter === 'plane') ? '#3a4454' : '#4ec0ca'; 
+        }
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        apartmentBuildings.forEach(building => {
+            let bx = building.x - (bgOffset * 0.2) % 520;
+            if(bx < -60) bx += 520;
+
+            ctx.fillStyle = isNight ? '#252936' : '#b6e4e7';
+            ctx.fillRect(bx, canvas.height - 120 - building.height, building.width, building.height);
+
+            let windowW = 6; let windowH = 10;
+            let rowGap = building.height / (building.windowRows + 1);
+            let colGap = building.width / (building.windowCols + 1);
+
+            for(let r=1; r<=building.windowRows; r++) {
+                for(let c=1; c<=building.windowCols; c++) {
+                    let wx = bx + c * colGap - windowW/2;
+                    let wy = (canvas.height - 120 - building.height) + r * rowGap - windowH/2;
+
+                    if(isNight) {
+                        ctx.fillStyle = '#fdf0a6';
+                        ctx.shadowBlur = 8; ctx.shadowColor = '#fcc419';
+                    } else {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.shadowBlur = 0;
+                    }
+                    ctx.fillRect(wx, wy, windowW, windowH);
+                    ctx.shadowBlur = 0;
+                }
+            }
+        });
+
+        ctx.fillStyle = isNight ? '#1b3322' : ((selectedCharacter === 'plane') ? '#385940' : '#62c17b');
+        for (let i = -10; i < canvas.width + 20; i += 20) {
+            ctx.beginPath(); ctx.arc(i - (bgOffset * 0.4) % 20, canvas.height - 130, 15, 0, Math.PI*2); ctx.fill();
+        }
+
+        pipes.forEach(pipe => {
+            if (pipe.blasted) return;
+            
+            ctx.fillStyle = '#73bf2e'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3;
+            
+            ctx.fillRect(pipe.x, 0, pipe.w, pipe.top);
+            ctx.strokeRect(pipe.x, -5, pipe.w, pipe.top + 5);
+            ctx.fillStyle = '#529916'; ctx.fillRect(pipe.x + pipe.w - 12, 0, 8, pipe.top);
+            
+            ctx.fillStyle = '#73bf2e'; ctx.fillRect(pipe.x - 4, pipe.top - 20, pipe.w + 8, 20);
+            ctx.strokeRect(pipe.x - 4, pipe.top - 20, pipe.w + 8, 20);
+
+            ctx.fillStyle = '#73bf2e';
+            ctx.fillRect(pipe.x, pipe.bottom, pipe.w, canvas.height - 120 - pipe.bottom);
+            ctx.strokeRect(pipe.x, pipe.bottom, pipe.w, canvas.height - 120 - pipe.bottom + 5);
+            ctx.fillStyle = '#529916'; ctx.fillRect(pipe.x + pipe.w - 12, pipe.bottom, 8, canvas.height - 120 - pipe.bottom);
+            
+            ctx.fillStyle = '#73bf2e'; ctx.fillRect(pipe.x - 4, pipe.bottom, pipe.w + 8, 20);
+            ctx.strokeRect(pipe.x - 4, pipe.bottom, pipe.w + 8, 20);
+        });
+
+        coins.forEach(coin => {
+            if (coin.collected) return;
+            ctx.fillStyle = '#fcc419'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1.5;
+            ctx.beginPath(); ctx.arc(coin.x, coin.y, coin.radius, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+        });
+
+        ctx.fillStyle = '#e63946'; bullets.forEach(b => ctx.fillRect(b.x, b.y, b.w, b.h));
+        pedestrians.forEach(p => {
+            ctx.fillStyle = '#fff'; ctx.fillRect(p.x, p.y, p.w, p.h);
+            ctx.fillStyle = '#000'; ctx.font = '10px monospace'; ctx.fillText("🛑", p.x - 2, p.y - 4);
+        });
+
+        lightnings.forEach(l => {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(230, 245, 255, ' + (l.timer / 20) + ')';
+            ctx.lineWidth = 3; ctx.shadowBlur = 15; ctx.shadowColor = '#a6d8ff';
+            ctx.beginPath();
+            l.segments.forEach(seg => {
+                ctx.moveTo(seg.x1, seg.y1); ctx.lineTo(seg.x2, seg.y2);
+            });
+            ctx.stroke();
+            ctx.strokeStyle = 'rgba(255, 255, 255, ' + (l.timer / 20) + ')';
+            ctx.lineWidth = 1.5; ctx.stroke();
+            ctx.restore();
+        });
+
+        ctx.fillStyle = isNight ? '#275718' : '#53bf33'; 
+        ctx.fillRect(0, canvas.height - 120, canvas.width, 14);
+        ctx.fillStyle = isNight ? '#5e431d' : '#d4a359'; 
+        ctx.fillRect(0, canvas.height - 106, canvas.width, 106);
+        ctx.fillStyle = '#000'; ctx.fillRect(0, canvas.height - 120, canvas.width, 3);
+
+        player.draw();
+    }
+
+    function performAction() {
+        if (isPlaying) player.flap();
+        else if (document.getElementById('menuScreen').style.display === 'none') {
+            document.getElementById('hudOverlay').style.display = 'none';
+            document.getElementById('scoreContainer').style.display = 'none';
+            document.getElementById('menuScreen').style.display = 'flex';
+        }
+    }
+
+    window.addEventListener('keydown', (e) => { if (e.code === 'Space' || e.code === 'ArrowUp') performAction(); });
+    canvas.addEventListener('mousedown', performAction);
+    canvas.addEventListener('touchstart', (e) => { e.preventDefault(); performAction(); }, { passive: false });
+
+    function runTick() {
+        buildObstacles(); updateEngine(); drawGraphics(); requestAnimationFrame(runTick);
+    }
+    runTick();
+</script>
+</body>
+</html>
