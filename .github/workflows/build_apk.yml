@@ -1,0 +1,72 @@
+name: Create APK from HTML
+
+# Ye 'workflow_dispatch' aapko GitHub Actions tab me ek button dega "Run workflow" ka
+on:
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'Apne App Ka Naam Likhein'
+        required: true
+        default: 'FastWeb App'
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest # Cloud server (GitHub ka heavy machine)
+
+    steps:
+      # 1. Aapke repository ka code fetch karega
+      - name: Fetch Repository Code
+        uses: actions/checkout@v4
+
+      # 2. Node.js setup (Apache Cordova ke liye zaroori hai)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # 3. Java Setup (Android APK build karne ke liye)
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 4. Cordova Install (Ye HTML/JS/CSS ko Android WebView me convert karta hai)
+      - name: Install Cordova
+        run: npm install -g cordova
+
+      # 5. Project Create karna aur Build karna
+      - name: Build APK Automatically
+        run: |
+          # Naya Cordova app create karega
+          cordova create myapp com.dev.webapp "${{ github.event.inputs.app_name }}"
+          cd myapp
+          
+          # Default files ko hata kar aapke repo ka resources daalega
+          # ZAROORI: Apne GitHub repo me ek 'web_files' naam ka folder banayein aur apna index.html, CSS, JS usme rakhein
+          rm -rf www/*
+          if [ -d "../web_files" ]; then
+            cp -r ../web_files/* www/
+          else
+            echo "<html><body><h1>Error: Please create a 'web_files' folder in your repo and put your HTML there!</h1></body></html>" > www/index.html
+          fi
+
+          # Logo set karna (Apne repo ke bahar/main folder me 'logo.png' naam ka image zaroor rakhein)
+          if [ -f "../logo.png" ]; then
+            cp ../logo.png ./logo.png
+            # config.xml me logo ka code automatically inject karega
+            sed -i 's|</widget>|    <icon src="logo.png" />\n</widget>|g' config.xml
+          fi
+
+          # Android environment add karke APK banayega (Bina kisi error ke)
+          cordova platform add android
+          cordova build android
+
+      # 6. Banaya hua APK aapke GitHub Actions ke "Artifacts" me download ke liye save kar dega
+      - name: Upload Output APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.inputs.app_name }}-App
+          # Ye path se .apk file fetch karke aapko dega
+          path: myapp/platforms/android/app/build/outputs/apk/debug/app-debug.apk
+          
